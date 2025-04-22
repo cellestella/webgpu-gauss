@@ -1,3 +1,13 @@
+struct Params {
+  mu: f32,
+  sigma: f32,
+  frequency: f32,
+  screenWidth: f32,
+};
+
+@group(0) @binding(0)
+var<uniform> params: Params;
+
 @fragment
 fn main(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
     // 高斯函数公式： f(x) = exp( -((x - μ)²) / (2 * σ²) ), exp(x) = 指数函数，e 的 x 次方
@@ -5,17 +15,17 @@ fn main(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
     
     // 这个片元着色器，会对画布上的每个像素应用一遍，pos 则代表了当前像素的坐标
 
-    const screenWidth = 640.0;
+    let screenWidth = params.screenWidth;
     // 将当前像素的 x 坐标归一化到 [0, 1] 区间
     // x 从 0 变化到 1 时，相当于在画布上从左到右对应了一整个高斯函数
     let x = pos.x / screenWidth;
 
     // 高斯峰的中心位置（屏幕中间）
-    let mu = 0.5;      
+    let mu = params.mu;      
     // 控制高斯条纹的宽度（越小越细，越大越宽）
-    let sigma = 0.2;   
+    let sigma = params.sigma;   
     // 每屏幕上出现多少个高斯峰 (多少个周期)
-    let frequency = 20.0;
+    let frequency = params.frequency;
     // 每个周期的宽度
     let period = 1.0 / frequency; 
 

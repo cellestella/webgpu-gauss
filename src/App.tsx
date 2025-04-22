@@ -18,13 +18,45 @@ function App() {
     });
     //初始化用于绘制的画布，与显卡绑定
     const context = canvasRef.current?.getContext("webgpu");
-    if (!context) {
+    if (!canvasRef.current || !context) {
       throw new Error("Canvas initialization failed");
     }
     const colorFormat = navigator.gpu.getPreferredCanvasFormat();
     context.configure({
       device,
       format: colorFormat,
+    });
+    const params = new Float32Array([
+      0.5, // mu
+      0.2, // sigma
+      10.0, // frequency
+      canvasRef.current.width, // screen width
+    ]);
+    const uniformBuffer = device.createBuffer({
+      size: params.byteLength,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+    device.queue.writeBuffer(uniformBuffer, 0, params);
+    const bindGroupLayout = device.createBindGroupLayout({
+      entries: [
+        {
+          binding: 0,
+          visibility: GPUShaderStage.FRAGMENT,
+          buffer: { type: "uniform" },
+        },
+      ],
+    });
+    const bindGroup = device.createBindGroup({
+      layout: bindGroupLayout,
+      entries: [
+        {
+          binding: 0,
+          resource: { buffer: uniformBuffer },
+        },
+      ],
+    });
+    const pipelineLayout = device.createPipelineLayout({
+      bindGroupLayouts: [bindGroupLayout],
     });
     const renderPipeline = device.createRenderPipeline({
       vertex: {
@@ -43,7 +75,7 @@ function App() {
       primitive: {
         topology: "triangle-list",
       },
-      layout: "auto",
+      layout: pipelineLayout,
     });
 
     const draw = () => {
@@ -61,6 +93,7 @@ function App() {
       };
       const passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
       passEncoder.setPipeline(renderPipeline);
+      passEncoder.setBindGroup(0, bindGroup);
       passEncoder.draw(3);
       passEncoder.end();
       device.queue.submit([commandEncoder.finish()]);
