@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import "./css/App.css";
-import vert from "./shader/vertex/triangle.wgsl?raw";
-import frag from "./shader/fragment/red.wgsl?raw";
+import vert from "./shader/vertex/fullscreen.wgsl?raw";
+import frag from "./shader/fragment/gauss.wgsl?raw";
 
 function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
