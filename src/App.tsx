@@ -190,7 +190,7 @@ function App() {
               value={params.sigma}
               min={0.001}
               max={0.5}
-              step={0.001}
+              step={0.005}
               onChange={(value) => setParams((p) => ({ ...p, sigma: value }))}
             />
           </Card>
