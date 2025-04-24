@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import "./css/App.css";
 import vert from "./shader/vertex/fullscreen.wgsl?raw";
 import frag from "./shader/fragment/gauss.wgsl?raw";
-import { Card, Col, Row, Slider } from "antd";
+import { Card, Col, Row, Slider, Space } from "antd";
+import { ParamInput } from "./ParamInput";
 
 function App() {
   const [mu, setMu] = useState(0.5);
@@ -151,41 +152,29 @@ function App() {
         </Col>
         <Col span={10}>
           <Card title={"参数"}>
-            <Row align={"middle"}>
-              <Col span={12}>频率freq（条纹数量）：</Col>
-              <Col span={12}>
-                <Slider
-                  min={1}
-                  max={20}
-                  onChange={(val: number) => setFrequency(val)}
-                  value={frequency}
-                />
-              </Col>
-            </Row>
-            <Row align={"middle"}>
-              <Col span={12}>中心位置μ（条纹位置）：</Col>
-              <Col span={12}>
-                <Slider
-                  min={0}
-                  max={1}
-                  step={0.1}
-                  onChange={(val: number) => setMu(val)}
-                  value={mu}
-                />
-              </Col>
-            </Row>
-            <Row align={"middle"}>
-              <Col span={12}>宽度σ (条纹宽度)：</Col>
-              <Col span={12}>
-                <Slider
-                  min={0.001}
-                  max={0.5}
-                  step={0.001}
-                  onChange={(val: number) => setSigma(val)}
-                  value={sigma}
-                />
-              </Col>
-            </Row>
+            <ParamInput
+              label="频率 Frequency（条纹数量）"
+              value={frequency}
+              min={1}
+              max={20}
+              onChange={setFrequency}
+            />
+            <ParamInput
+              label="中心位置 μ（高斯峰位置）"
+              value={mu}
+              min={0}
+              max={1}
+              step={0.01}
+              onChange={setMu}
+            />
+            <ParamInput
+              label="宽度 σ（高斯峰宽度）"
+              value={sigma}
+              min={0.001}
+              max={0.5}
+              step={0.001}
+              onChange={setSigma}
+            />
           </Card>
         </Col>
       </Row>
