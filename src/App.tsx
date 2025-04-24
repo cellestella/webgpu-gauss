@@ -2,16 +2,19 @@ import { useEffect, useRef, useState } from "react";
 import "./css/App.css";
 import vert from "./shader/vertex/fullscreen.wgsl?raw";
 import frag from "./shader/fragment/gauss.wgsl?raw";
-import { Card, Col, Row, Slider, Space } from "antd";
+import { Card, Col, Row } from "antd";
 import { ParamInput } from "./ParamInput";
 
 function App() {
-  const [mu, setMu] = useState(0.5);
-  const [sigma, setSigma] = useState(0.2);
-  const [frequency, setFrequency] = useState(1);
+  const [params, setParams] = useState({
+    mu: 0.5,
+    sigma: 0.2,
+    frequency: 1,
+  });
   const canvasWidth = 640;
   const canvasHeight = 480;
 
+  const paramsRef = useRef(params);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gpuRef = useRef<GPUDevice>(null);
   const canvasContextRef = useRef<GPUCanvasContext>(null);
@@ -19,86 +22,89 @@ function App() {
   const pipelineRef = useRef<GPURenderPipeline>(null);
   const bindGroupRef = useRef<GPUBindGroup>(null);
   const uniformBufferRef = useRef<GPUBuffer>(null);
+  const animationFrameRef = useRef<number>(null);
 
   useEffect(() => {
-    async function init() {
-      const adapter = await navigator.gpu?.requestAdapter();
-      const gpu = await adapter?.requestDevice();
-      if (!gpu) throw new Error("WebGPU not supported");
-      gpu.lost.then(() => {
-        throw new Error("GPU device lost");
-      });
+    paramsRef.current = params;
+  }, [params]);
 
-      const canvas = canvasRef.current!;
-      const canvasContext = canvas.getContext("webgpu")!;
-      const colorFormat = navigator.gpu.getPreferredCanvasFormat();
-      canvasContext.configure({ device: gpu, format: colorFormat });
+  async function init() {
+    const adapter = await navigator.gpu?.requestAdapter();
+    const gpu = await adapter?.requestDevice();
+    if (!gpu) throw new Error("WebGPU not supported");
+    gpu.lost.then(() => {
+      throw new Error("GPU device lost");
+    });
 
-      gpuRef.current = gpu;
-      canvasContextRef.current = canvasContext;
-      colorFormatRef.current = colorFormat;
+    const canvas = canvasRef.current!;
+    const canvasContext = canvas.getContext("webgpu")!;
+    const colorFormat = navigator.gpu.getPreferredCanvasFormat();
+    canvasContext.configure({ device: gpu, format: colorFormat });
 
-      const uniformBuffer = gpu.createBuffer({
-        size: 4 * 4,
-        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-      });
-      uniformBufferRef.current = uniformBuffer;
+    gpuRef.current = gpu;
+    canvasContextRef.current = canvasContext;
+    colorFormatRef.current = colorFormat;
 
-      const bindGroupLayout = gpu.createBindGroupLayout({
-        entries: [
-          {
-            binding: 0,
-            visibility: GPUShaderStage.FRAGMENT,
-            buffer: { type: "uniform" },
-          },
-        ],
-      });
-      const bindGroup = gpu.createBindGroup({
-        layout: bindGroupLayout,
-        entries: [
-          {
-            binding: 0,
-            resource: { buffer: uniformBuffer },
-          },
-        ],
-      });
-      bindGroupRef.current = bindGroup;
+    const uniformBuffer = gpu.createBuffer({
+      size: 4 * 4,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+    uniformBufferRef.current = uniformBuffer;
 
-      const pipelineLayout = gpu.createPipelineLayout({
-        bindGroupLayouts: [bindGroupLayout],
-      });
-      const pipeline = gpu.createRenderPipeline({
-        layout: pipelineLayout,
-        vertex: {
-          module: gpu.createShaderModule({ code: vert }),
-          entryPoint: "main",
+    const bindGroupLayout = gpu.createBindGroupLayout({
+      entries: [
+        {
+          binding: 0,
+          visibility: GPUShaderStage.FRAGMENT,
+          buffer: { type: "uniform" },
         },
-        fragment: {
-          module: gpu.createShaderModule({ code: frag }),
-          entryPoint: "main",
-          targets: [{ format: colorFormat }],
+      ],
+    });
+    const bindGroup = gpu.createBindGroup({
+      layout: bindGroupLayout,
+      entries: [
+        {
+          binding: 0,
+          resource: { buffer: uniformBuffer },
         },
-        primitive: {
-          topology: "triangle-list",
-        },
-      });
-      pipelineRef.current = pipeline;
+      ],
+    });
+    bindGroupRef.current = bindGroup;
 
-      draw();
-    }
+    const pipelineLayout = gpu.createPipelineLayout({
+      bindGroupLayouts: [bindGroupLayout],
+    });
+    const pipeline = gpu.createRenderPipeline({
+      layout: pipelineLayout,
+      vertex: {
+        module: gpu.createShaderModule({ code: vert }),
+        entryPoint: "main",
+      },
+      fragment: {
+        module: gpu.createShaderModule({ code: frag }),
+        entryPoint: "main",
+        targets: [{ format: colorFormat }],
+      },
+      primitive: {
+        topology: "triangle-list",
+      },
+    });
+    pipelineRef.current = pipeline;
 
-    init();
-  }, []);
+    loopPerFrame();
+  }
 
   const draw = () => {
-    const gpu = gpuRef.current!;
-    const canvasContext = canvasContextRef.current!;
-    const pipeline = pipelineRef.current!;
-    const bindGroup = bindGroupRef.current!;
-    const buffer = uniformBufferRef.current!;
+    const gpu = gpuRef.current;
+    const canvasContext = canvasContextRef.current;
+    const pipeline = pipelineRef.current;
+    const bindGroup = bindGroupRef.current;
+    const buffer = uniformBufferRef.current;
+    if (!gpu || !canvasContext || !pipeline || !bindGroup || !buffer) return;
 
-    const params = new Float32Array([mu, sigma, frequency, canvasWidth]);
-    gpu.queue.writeBuffer(buffer, 0, params);
+    const { mu, sigma, frequency } = paramsRef.current;
+    const data = new Float32Array([mu, sigma, frequency, canvasWidth]);
+    gpu.queue.writeBuffer(buffer, 0, data);
 
     const commandEncoder = gpu.createCommandEncoder();
     const textureView = canvasContext.getCurrentTexture().createView();
@@ -119,11 +125,21 @@ function App() {
     gpu.queue.submit([commandEncoder.finish()]);
   };
 
-  useEffect(() => {
-    if (gpuRef.current && uniformBufferRef.current) {
-      draw();
+  const loopPerFrame = () => {
+    draw();
+    animationFrameRef.current = requestAnimationFrame(loopPerFrame);
+  };
+
+  const exit = () => {
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
     }
-  }, [mu, sigma, frequency]);
+  };
+
+  useEffect(() => {
+    init();
+    return exit;
+  }, []);
 
   return (
     <div style={{ margin: 32 }}>
@@ -154,26 +170,28 @@ function App() {
           <Card title={"参数"}>
             <ParamInput
               label="频率 Frequency（条纹数量）"
-              value={frequency}
+              value={params.frequency}
               min={1}
               max={20}
-              onChange={setFrequency}
+              onChange={(value) =>
+                setParams((p) => ({ ...p, frequency: value }))
+              }
             />
             <ParamInput
               label="中心位置 μ（高斯峰位置）"
-              value={mu}
+              value={params.mu}
               min={0}
               max={1}
               step={0.01}
-              onChange={setMu}
+              onChange={(value) => setParams((p) => ({ ...p, mu: value }))}
             />
             <ParamInput
               label="宽度 σ（高斯峰宽度）"
-              value={sigma}
+              value={params.sigma}
               min={0.001}
               max={0.5}
               step={0.001}
-              onChange={setSigma}
+              onChange={(value) => setParams((p) => ({ ...p, sigma: value }))}
             />
           </Card>
         </Col>
