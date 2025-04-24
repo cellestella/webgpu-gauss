@@ -178,7 +178,7 @@ function App() {
               }
             />
             <ParamInput
-              label="中心位置 μ（高斯峰位置）"
+              label="中心位置 μ（条纹位置）"
               value={params.mu}
               min={0}
               max={1}
@@ -186,7 +186,7 @@ function App() {
               onChange={(value) => setParams((p) => ({ ...p, mu: value }))}
             />
             <ParamInput
-              label="宽度 σ（高斯峰宽度）"
+              label="宽度 σ（条纹宽度）"
               value={params.sigma}
               min={0.001}
               max={0.5}
