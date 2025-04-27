@@ -22,6 +22,7 @@ function App() {
 
   const paramsRef = useRef(params);
   const cachedParamsRef = useRef<object | null>(null);
+  const cacheEnabledRef = useRef(cacheEnabled);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gpuRef = useRef<GPUDevice>(null);
   const canvasContextRef = useRef<GPUCanvasContext>(null);
@@ -34,6 +35,10 @@ function App() {
   useEffect(() => {
     paramsRef.current = params;
   }, [params]);
+
+  useEffect(() => {
+    cacheEnabledRef.current = cacheEnabled;
+  }, [cacheEnabled]);
 
   async function init() {
     const adapter = await navigator.gpu?.requestAdapter();
@@ -110,7 +115,7 @@ function App() {
     const bindGroup = bindGroupRef.current;
     const buffer = uniformBufferRef.current;
     if (!gpu || !canvasContext || !pipeline || !bindGroup || !buffer) return;
-    if (cacheEnabled) {
+    if (cacheEnabledRef.current) {
       if (_.isEqual(paramsRef.current, cachedParamsRef.current)) {
         return;
       } else {
@@ -160,7 +165,7 @@ function App() {
   useEffect(() => {
     init();
     return exit;
-  }, [stressTestEnabled, cacheEnabled]);
+  }, [stressTestEnabled]);
 
   return (
     <div style={{ margin: 32 }}>
