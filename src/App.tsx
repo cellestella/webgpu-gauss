@@ -3,9 +3,10 @@ import "./css/App.css";
 import vert from "./shader/vertex/fullscreen.wgsl?raw";
 import frag from "./shader/fragment/gauss.wgsl?raw";
 import stress from "./shader/fragment/stress.wgsl?raw";
-import { Card, Col, Row } from "antd";
+import { Card, Col, Row, Switch } from "antd";
 import { ParamInput } from "./ParamInput";
 import { FpsMonitor } from "./FpsMonitor";
+import _ from "lodash";
 
 function App() {
   const [params, setParams] = useState({
@@ -15,10 +16,12 @@ function App() {
     stressLevel: 0,
   });
   const stressTestEnabled = params.stressLevel > 0;
+  const [cacheEnabled, setCacheEnabled] = useState(false);
   const canvasWidth = 640;
   const canvasHeight = 480;
 
   const paramsRef = useRef(params);
+  const cachedParamsRef = useRef<object | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gpuRef = useRef<GPUDevice>(null);
   const canvasContextRef = useRef<GPUCanvasContext>(null);
@@ -107,7 +110,13 @@ function App() {
     const bindGroup = bindGroupRef.current;
     const buffer = uniformBufferRef.current;
     if (!gpu || !canvasContext || !pipeline || !bindGroup || !buffer) return;
-
+    if (cacheEnabled) {
+      if (_.isEqual(paramsRef.current, cachedParamsRef.current)) {
+        return;
+      } else {
+        cachedParamsRef.current = _.cloneDeep(paramsRef.current);
+      }
+    }
     const { mu, sigma, frequency, stressLevel } = paramsRef.current;
     const data = new Float32Array([
       mu,
@@ -151,7 +160,7 @@ function App() {
   useEffect(() => {
     init();
     return exit;
-  }, [stressTestEnabled]);
+  }, [stressTestEnabled, cacheEnabled]);
 
   return (
     <div style={{ margin: 32 }}>
@@ -209,12 +218,21 @@ function App() {
               label="压力测试等级（逐渐增加，避免GPU负载过高卡死）"
               value={params.stressLevel}
               min={0}
-              max={20}
+              max={30}
               step={1}
               onChange={(value) =>
                 setParams((p) => ({ ...p, stressLevel: value }))
               }
             />
+            <Row gutter={16} align={"middle"} style={{ paddingBottom: 16 }}>
+              <Col>开启缓存</Col>
+              <Col>
+                <Switch
+                  value={cacheEnabled}
+                  onChange={(checked) => setCacheEnabled(checked)}
+                ></Switch>
+              </Col>
+            </Row>
             <Row>
               <Col>
                 <FpsMonitor />
