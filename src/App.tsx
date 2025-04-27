@@ -2,15 +2,19 @@ import { useEffect, useRef, useState } from "react";
 import "./css/App.css";
 import vert from "./shader/vertex/fullscreen.wgsl?raw";
 import frag from "./shader/fragment/gauss.wgsl?raw";
+import stress from "./shader/fragment/stress.wgsl?raw";
 import { Card, Col, Row } from "antd";
 import { ParamInput } from "./ParamInput";
+import { FpsMonitor } from "./FpsMonitor";
 
 function App() {
   const [params, setParams] = useState({
     mu: 0.5,
     sigma: 0.2,
     frequency: 1,
+    stressLevel: 0,
   });
+  const stressTestEnabled = params.stressLevel > 0;
   const canvasWidth = 640;
   const canvasHeight = 480;
 
@@ -46,7 +50,7 @@ function App() {
     colorFormatRef.current = colorFormat;
 
     const uniformBuffer = gpu.createBuffer({
-      size: 4 * 4,
+      size: 5 * 4,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
     uniformBufferRef.current = uniformBuffer;
@@ -81,7 +85,9 @@ function App() {
         entryPoint: "main",
       },
       fragment: {
-        module: gpu.createShaderModule({ code: frag }),
+        module: gpu.createShaderModule({
+          code: !stressTestEnabled ? frag : stress,
+        }),
         entryPoint: "main",
         targets: [{ format: colorFormat }],
       },
@@ -102,8 +108,14 @@ function App() {
     const buffer = uniformBufferRef.current;
     if (!gpu || !canvasContext || !pipeline || !bindGroup || !buffer) return;
 
-    const { mu, sigma, frequency } = paramsRef.current;
-    const data = new Float32Array([mu, sigma, frequency, canvasWidth]);
+    const { mu, sigma, frequency, stressLevel } = paramsRef.current;
+    const data = new Float32Array([
+      mu,
+      sigma,
+      frequency,
+      canvasWidth,
+      stressLevel,
+    ]);
     gpu.queue.writeBuffer(buffer, 0, data);
 
     const commandEncoder = gpu.createCommandEncoder();
@@ -139,7 +151,7 @@ function App() {
   useEffect(() => {
     init();
     return exit;
-  }, []);
+  }, [stressTestEnabled]);
 
   return (
     <div style={{ margin: 32 }}>
@@ -193,6 +205,21 @@ function App() {
               step={0.005}
               onChange={(value) => setParams((p) => ({ ...p, sigma: value }))}
             />
+            <ParamInput
+              label="压力测试等级（逐渐增加，避免GPU负载过高卡死）"
+              value={params.stressLevel}
+              min={0}
+              max={20}
+              step={1}
+              onChange={(value) =>
+                setParams((p) => ({ ...p, stressLevel: value }))
+              }
+            />
+            <Row>
+              <Col>
+                <FpsMonitor />
+              </Col>
+            </Row>
           </Card>
         </Col>
       </Row>
